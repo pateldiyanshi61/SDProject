@@ -77,40 +77,67 @@ services:
         condition: service_healthy
     entrypoint: >
       bash -c "
-      echo 'Initializing replica sets...' &&
-      sleep 5 &&
+      echo 'Waiting for MongoDB instances to be ready...' &&
+      sleep 10 &&
 
+      echo 'Initializing config server replica set...' &&
       mongosh --host configsvr:27019 --quiet --eval '
-        let status = rs.status();
-        if (status.ok !== 1) {
+        try {
           rs.initiate({
             _id: \"configReplSet\",
             configsvr: true,
             members: [{ _id: 0, host: \"configsvr:27019\" }]
           });
+          print(\"Config server replica set initiated\");
+        } catch (e) {
+          if (e.codeName === \"AlreadyInitialized\") {
+            print(\"Config server already initialized\");
+          } else {
+            throw e;
+          }
         }
       ' &&
 
+      echo 'Waiting for config server to be ready...' &&
+      sleep 5 &&
+
+      echo 'Initializing shard1 replica set...' &&
       mongosh --host shard1:27018 --quiet --eval '
-        let status = rs.status();
-        if (status.ok !== 1) {
+        try {
           rs.initiate({
             _id: \"shard1ReplSet\",
             members: [{ _id: 0, host: \"shard1:27018\" }]
           });
+          print(\"Shard1 replica set initiated\");
+        } catch (e) {
+          if (e.codeName === \"AlreadyInitialized\") {
+            print(\"Shard1 already initialized\");
+          } else {
+            throw e;
+          }
         }
       ' &&
 
+      echo 'Initializing shard2 replica set...' &&
       mongosh --host shard2:27018 --quiet --eval '
-        let status = rs.status();
-        if (status.ok !== 1) {
+        try {
           rs.initiate({
             _id: \"shard2ReplSet\",
             members: [{ _id: 0, host: \"shard2:27018\" }]
           });
+          print(\"Shard2 replica set initiated\");
+        } catch (e) {
+          if (e.codeName === \"AlreadyInitialized\") {
+            print(\"Shard2 already initialized\");
+          } else {
+            throw e;
+          }
         }
       ' &&
-      sleep 10
+
+      echo 'Waiting for replica sets to stabilize...' &&
+      sleep 15 &&
+      echo 'Replica set initialization complete'
       "
     networks:
       - mongo-net
@@ -124,6 +151,7 @@ services:
         condition: service_completed_successfully
     command: >
       bash -c "
+      echo 'Starting mongos router...' &&
       mongos --configdb configReplSet/configsvr:27019 --bind_ip_all --port 27017
       "
     ports:
@@ -148,8 +176,11 @@ services:
       - ./init-sharding.js:/init-sharding.js
     entrypoint: >
       bash -c "
-      sleep 15 &&
-      mongosh --host mongos:27017 /init-sharding.js
+      echo 'Waiting for mongos to be fully ready...' &&
+      sleep 20 &&
+      echo 'Running sharding initialization...' &&
+      mongosh --host mongos:27017 /init-sharding.js &&
+      echo 'Sharding initialization completed'
       "
     networks:
       - mongo-net
@@ -186,8 +217,9 @@ services:
     environment:
       - MONGO_URI=mongodb://mongos:27017
       - JWT_SECRET=your_super_secret_jwt_key_change_in_production
+      - AUTH_SERVICE_URL=http://auth-service:8000
     ports:
-      - "8001:8000"
+      - "8001:8001"
     restart: unless-stopped
     networks:
       - backend-net
@@ -209,8 +241,10 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
+      - JWT_SECRET=your_super_secret_jwt_key_change_in_production
+      - AUTH_SERVICE_URL=http://auth-service:8000
     ports:
-      - "8002:8000"
+      - "8002:8002"
     restart: unless-stopped
     networks:
       - backend-net
@@ -230,6 +264,10 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
+      - JWT_SECRET=your_super_secret_jwt_key_change_in_production
+      - AUTH_SERVICE_URL=http://auth-service:8000
+    ports:
+      - "8003:8003"
     restart: unless-stopped
     networks:
       - backend-net
