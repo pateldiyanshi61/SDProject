@@ -9,6 +9,7 @@ class NotificationOut(BaseModel):
     payload: dict
     delivered: bool
     createdAt: Optional[datetime] = None
+    deliveredAt: Optional[datetime] = None
 
 class NotificationSend(BaseModel):
     userId: str

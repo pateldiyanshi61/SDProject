@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
+from bson import ObjectId
 from ..db import notifications
 from ..schemas import NotificationOut, NotificationSend
 from ..auth import verify_token
@@ -26,6 +27,28 @@ async def list_notifications(
         result.append(notif)
     
     return result
+
+@router.patch("/{notification_id}/mark-delivered")
+async def mark_delivered(notification_id: str, user=Depends(verify_token)):
+    try:
+        notif_obj_id = ObjectId(notification_id)
+    except:
+        raise HTTPException(400, "Invalid notification ID")
+    
+    notif = await notifications.find_one({"_id": notif_obj_id})
+    if not notif:
+        raise HTTPException(404, "Notification not found")
+    
+    # Users can only update their own notifications
+    if user.get("user_id") != notif.get("userId"):
+        raise HTTPException(403, "Forbidden")
+    
+    await notifications.update_one(
+        {"_id": notif_obj_id},
+        {"$set": {"delivered": True, "deliveredAt": datetime.datetime.utcnow()}}
+    )
+    
+    return {"status": "success", "message": "Notification marked as delivered"}
 
 @router.post("/send")
 async def send_notification(payload: NotificationSend, user=Depends(verify_token)):
