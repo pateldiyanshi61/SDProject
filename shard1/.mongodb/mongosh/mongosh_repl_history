@@ -1,0 +1,18 @@
+exit
+})
+  members: [{ _id: 0, host: "shard1:27018" }]
+  _id: "shard1ReplSet",
+rs.initiate({
+exit
+docker exec -it shard2 mongosh --port 27018
+})
+  members: [{ _id: 0, host: "shard1:27018" }]
+  _id: "shard1ReplSet",
+rs.initiate({
+rs.status()
+exit
+rs.status()
+})
+  members: [{ _id: 0, host: "shard1:27018" }]
+  _id: "shard1ReplSet",
+rs.initiate({

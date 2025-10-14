@@ -1,0 +1,11 @@
+exit
+})
+  members: [{ _id: 0, host: "shard2:27018" }]
+  _id: "shard2ReplSet",
+rs.initiate({
+exit
+rs.status()
+})
+  members: [{ _id: 0, host: "shard2:27018" }]
+  _id: "shard2ReplSet",
+rs.initiate({

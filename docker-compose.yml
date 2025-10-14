@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # ---------- RABBITMQ ----------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - backend-net
+
+  # ---------- CONFIG SERVER ----------
+  configsvr:
+    image: mongo:6.0
+    container_name: configsvr
+    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
+    volumes:
+      - ./configsvr:/data/db
+    networks:
+      - mongo-net
+
+  # ---------- SHARD 1 ----------
+  shard1:
+    image: mongo:6.0
+    container_name: shard1
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all
+    volumes:
+      - ./shard1:/data/db
+    networks:
+      - mongo-net
+
+  # ---------- SHARD 2 ----------
+  shard2:
+    image: mongo:6.0
+    container_name: shard2
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --bind_ip_all
+    volumes:
+      - ./shard2:/data/db
+    networks:
+      - mongo-net
+
+  # ---------- MONGOS ROUTER ----------
+  mongos:
+    image: mongo:6.0
+    container_name: mongos
+    depends_on:
+      - configsvr
+      - shard1
+      - shard2
+    command: >
+      bash -c "
+      sleep 10 &&
+      mongos --configdb configReplSet/configsvr:27019
+             --bind_ip_all
+             --port 27017
+      "
+    ports:
+      - "27017:27017"
+    networks:
+      - mongo-net
+
+  # ---------- INIT SHARDING ----------
+  # init-sharding:
+  #   image: mongo:6.0
+  #   container_name: init-sharding
+  #   depends_on:
+  #     - mongos
+  #   volumes:
+  #     - ./init-sharding.js:/init-sharding.js
+  #   entrypoint: >
+  #     bash -c "
+  #     sleep 25 &&
+  #     mongosh --host mongos:27017 /init-sharding.js
+  #     "
+  #   networks:
+  #     - mongo-net
+
+  # ---------- AUTH SERVICE ----------
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    depends_on:
+      - mongos
+      - rabbitmq
+    environment:
+      - MONGO_URI=mongodb://mongos:27017/banking
+      - JWT_SECRET=CHANGE_THIS_SECRET
+      - RABBITMQ_HOST=rabbitmq
+    ports:
+      - "8000:8000"
+    networks:
+      - backend-net
+      - mongo-net
+
+  account-service:
+    build: ./account-service
+    container_name: account-service
+    depends_on:
+      - mongo-db
+    environment:
+      - MONGO_URI=mongodb://mongo-db:27017/banking
+    ports:
+      - "8001:8001"
+    networks:
+      - backend-net
+      - mongo-net
+
+  transaction-service:
+    build: ./transaction-service
+    container_name: transaction-service
+    depends_on:
+      - account-service
+      - mongo-db
+      - rabbitmq
+    environment:
+      - MONGO_URI=mongodb://mongo-db:27017/banking
+      - RABBITMQ_HOST=rabbitmq
+    ports:
+      - "8002:8002"
+    networks:
+      - backend-net
+      - mongo-net
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    depends_on:
+      - rabbitmq
+      - mongo-db
+    environment:
+      - MONGO_URI=mongodb://mongo-db:27017/banking
+      - RABBITMQ_HOST=rabbitmq
+    networks:
+      - backend-net
+      - mongo-net
+
+
+networks:
+  backend-net:
+    driver: bridge
+  mongo-net:
+    driver: bridge
