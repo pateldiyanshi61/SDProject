@@ -8,6 +8,14 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - backend-net
 
@@ -17,7 +25,12 @@ services:
     container_name: configsvr
     command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
     volumes:
-      - ./configsvr:/data/db
+      - configsvr-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27019", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mongo-net
 
@@ -27,7 +40,12 @@ services:
     container_name: shard1
     command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all
     volumes:
-      - ./shard1:/data/db
+      - shard1-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mongo-net
 
@@ -37,7 +55,63 @@ services:
     container_name: shard2
     command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --bind_ip_all
     volumes:
-      - ./shard2:/data/db
+      - shard2-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mongo-net
+
+  # ---------- INIT REPLICA SETS ----------
+  init-replica-sets:
+    image: mongo:6.0
+    container_name: init-replica-sets
+    depends_on:
+      configsvr:
+        condition: service_healthy
+      shard1:
+        condition: service_healthy
+      shard2:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+      echo 'Initializing replica sets...' &&
+      sleep 5 &&
+
+      mongosh --host configsvr:27019 --quiet --eval '
+        let status = rs.status();
+        if (status.ok !== 1) {
+          rs.initiate({
+            _id: \"configReplSet\",
+            configsvr: true,
+            members: [{ _id: 0, host: \"configsvr:27019\" }]
+          });
+        }
+      ' &&
+
+      mongosh --host shard1:27018 --quiet --eval '
+        let status = rs.status();
+        if (status.ok !== 1) {
+          rs.initiate({
+            _id: \"shard1ReplSet\",
+            members: [{ _id: 0, host: \"shard1:27018\" }]
+          });
+        }
+      ' &&
+
+      mongosh --host shard2:27018 --quiet --eval '
+        let status = rs.status();
+        if (status.ok !== 1) {
+          rs.initiate({
+            _id: \"shard2ReplSet\",
+            members: [{ _id: 0, host: \"shard2:27018\" }]
+          });
+        }
+      ' &&
+      sleep 10
+      "
     networks:
       - mongo-net
 
@@ -46,99 +120,128 @@ services:
     image: mongo:6.0
     container_name: mongos
     depends_on:
-      - configsvr
-      - shard1
-      - shard2
+      init-replica-sets:
+        condition: service_completed_successfully
     command: >
       bash -c "
-      sleep 10 &&
-      mongos --configdb configReplSet/configsvr:27019
-             --bind_ip_all
-             --port 27017
+      mongos --configdb configReplSet/configsvr:27019 --bind_ip_all --port 27017
       "
     ports:
       - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mongo-net
+      - backend-net
 
   # ---------- INIT SHARDING ----------
-  # init-sharding:
-  #   image: mongo:6.0
-  #   container_name: init-sharding
-  #   depends_on:
-  #     - mongos
-  #   volumes:
-  #     - ./init-sharding.js:/init-sharding.js
-  #   entrypoint: >
-  #     bash -c "
-  #     sleep 25 &&
-  #     mongosh --host mongos:27017 /init-sharding.js
-  #     "
-  #   networks:
-  #     - mongo-net
+  init-sharding:
+    image: mongo:6.0
+    container_name: init-sharding
+    depends_on:
+      mongos:
+        condition: service_healthy
+    volumes:
+      - ./init-sharding.js:/init-sharding.js
+    entrypoint: >
+      bash -c "
+      sleep 15 &&
+      mongosh --host mongos:27017 /init-sharding.js
+      "
+    networks:
+      - mongo-net
 
   # ---------- AUTH SERVICE ----------
   auth-service:
     build: ./auth-service
     container_name: auth-service
     depends_on:
-      - mongos
-      - rabbitmq
+      init-sharding:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://mongos:27017/banking
-      - JWT_SECRET=CHANGE_THIS_SECRET
+      - MONGO_URI=mongodb://mongos:27017
+      - JWT_SECRET=your_super_secret_jwt_key_change_in_production
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     ports:
       - "8000:8000"
+    restart: unless-stopped
     networks:
       - backend-net
       - mongo-net
 
+  # ---------- ACCOUNT SERVICE ----------
   account-service:
     build: ./account-service
     container_name: account-service
     depends_on:
-      - mongo-db
+      init-sharding:
+        condition: service_completed_successfully
     environment:
-      - MONGO_URI=mongodb://mongo-db:27017/banking
+      - MONGO_URI=mongodb://mongos:27017
+      - JWT_SECRET=your_super_secret_jwt_key_change_in_production
     ports:
-      - "8001:8001"
+      - "8001:8000"
+    restart: unless-stopped
     networks:
       - backend-net
       - mongo-net
 
+  # ---------- TRANSACTION SERVICE ----------
   transaction-service:
     build: ./transaction-service
     container_name: transaction-service
     depends_on:
-      - account-service
-      - mongo-db
-      - rabbitmq
+      account-service:
+        condition: service_started
+      init-sharding:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://mongo-db:27017/banking
+      - MONGO_URI=mongodb://mongos:27017
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     ports:
-      - "8002:8002"
+      - "8002:8000"
+    restart: unless-stopped
     networks:
       - backend-net
       - mongo-net
 
+  # ---------- NOTIFICATION SERVICE ----------
   notification-service:
     build: ./notification-service
     container_name: notification-service
     depends_on:
-      - rabbitmq
-      - mongo-db
+      rabbitmq:
+        condition: service_healthy
+      init-sharding:
+        condition: service_completed_successfully
     environment:
-      - MONGO_URI=mongodb://mongo-db:27017/banking
+      - MONGO_URI=mongodb://mongos:27017
       - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    restart: unless-stopped
     networks:
       - backend-net
       - mongo-net
-
 
 networks:
   backend-net:
     driver: bridge
   mongo-net:
     driver: bridge
+
+volumes:
+  configsvr-data:
+  shard1-data:
+  shard2-data:
