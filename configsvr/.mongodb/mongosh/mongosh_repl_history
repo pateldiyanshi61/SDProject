@@ -1,0 +1,27 @@
+exit
+rs.status()
+rs.status
+exit
+})
+  members: [{ _id: 0, host: "configsvr:27019" }]
+  configsvr: true,
+  _id: "configReplSet",
+rs.initiate({
+exit
+rs.status()
+exit
+rs.status()
+exit
+rs.status()
+})
+  members: [{ _id: 0, host: "configsvr:27019" }]
+  configsvr: true,
+  _id: "configReplSet",
+rs.initiate({
+exit
+rs.status()
+})
+  members: [{ _id: 0, host: "configsvr:27019" }]
+  configsvr: true,
+  _id: "configReplSet",
+rs.initiate({
