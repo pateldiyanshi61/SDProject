@@ -1,7 +1,7 @@
+pika
+motor
+python-dotenv
 fastapi
 uvicorn[standard]
-motor
 pydantic
-python-dotenv
-pika
 pyjwt
