@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from ..db import accounts, transactions, db
 from ..schemas import TransferIn, TransactionOut
-from ..publisher import publish_notification
+from ..publisher import publish_notification, publish_error
 from ..auth import verify_token
 import datetime
 import uuid
@@ -25,51 +25,86 @@ async def transfer(payload: TransferIn, user=Depends(verify_token)):
     if a_from.get("status", "active") != "active":
         raise HTTPException(400, "Sender account not active")
     
+    if a_to.get("status", "active") != "active":
+        raise HTTPException(400, "Receiver account not active")
+    
     if a_from.get("balance", 0) < payload.amount:
         raise HTTPException(400, "Insufficient funds")
 
-    # Use MongoDB transaction (requires replica sets + mongos)
-    async with await db.client.start_session() as s:
-        async with s.start_transaction():
-            # decrement sender
-            await accounts.update_one(
-                {"accountNumber": payload.fromAccount},
-                {"$inc": {"balance": -payload.amount}}, 
-                session=s
-            )
-            # increment receiver
-            await accounts.update_one(
-                {"accountNumber": payload.toAccount},
-                {"$inc": {"balance": payload.amount}}, 
-                session=s
-            )
-            # create transaction record
-            tx = {
-                "txId": f"TXN-{uuid.uuid4().hex[:12]}",
-                "fromAccount": payload.fromAccount,
-                "toAccount": payload.toAccount,
-                "amount": payload.amount,
-                "currency": payload.currency,
-                "status": "SUCCESS",
-                "createdAt": datetime.datetime.utcnow()
-            }
-            await transactions.insert_one(tx, session=s)
+    tx_id = f"TXN-{uuid.uuid4().hex[:12]}"
     
-    # publish notification asynchronously (fire-and-forget)
     try:
-        publish_notification({
-            "userId": str(a_from.get("userId")),
-            "type": "TRANSACTION",
-            "payload": {
-                "message": f"Transfer of {payload.amount} {payload.currency} to {payload.toAccount}",
-                "txId": tx["txId"]
-            },
-            "createdAt": datetime.datetime.utcnow().isoformat()
-        })
-    except Exception as e:
-        print(f"Failed to publish notification: {e}")
+        # Use MongoDB transaction (requires replica sets + mongos)
+        async with await db.client.start_session() as s:
+            async with s.start_transaction():
+                # Decrement sender
+                await accounts.update_one(
+                    {"accountNumber": payload.fromAccount},
+                    {"$inc": {"balance": -payload.amount}}, 
+                    session=s
+                )
+                # Increment receiver
+                await accounts.update_one(
+                    {"accountNumber": payload.toAccount},
+                    {"$inc": {"balance": payload.amount}}, 
+                    session=s
+                )
+                # Create transaction record
+                tx = {
+                    "txId": tx_id,
+                    "fromAccount": payload.fromAccount,
+                    "toAccount": payload.toAccount,
+                    "amount": payload.amount,
+                    "currency": payload.currency,
+                    "status": "SUCCESS",
+                    "createdAt": datetime.datetime.utcnow(),
+                    "retry_count": 0
+                }
+                await transactions.insert_one(tx, session=s)
+        
+        # Publish notifications asynchronously (fire-and-forget)
+        try:
+            publish_notification({
+                "userId": str(a_from.get("userId")),
+                "type": "TRANSACTION_SENT",
+                "payload": {
+                    "message": f"Transfer of {payload.amount} {payload.currency} to {payload.toAccount}",
+                    "txId": tx_id,
+                    "amount": payload.amount
+                },
+                "createdAt": datetime.datetime.utcnow().isoformat()
+            })
+            
+            publish_notification({
+                "userId": str(a_to.get("userId")),
+                "type": "TRANSACTION_RECEIVED",
+                "payload": {
+                    "message": f"Received {payload.amount} {payload.currency} from {payload.fromAccount}",
+                    "txId": tx_id,
+                    "amount": payload.amount
+                },
+                "createdAt": datetime.datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            print(f"Warning: Failed to publish notification: {e}")
+        
+        return {"status": "success", "txId": tx_id}
     
-    return {"status": "success", "txId": tx["txId"]}
+    except Exception as e:
+        error_msg = {
+            "txId": tx_id,
+            "fromAccount": payload.fromAccount,
+            "toAccount": payload.toAccount,
+            "amount": payload.amount,
+            "error": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "retry_count": 0
+        }
+        try:
+            publish_error(error_msg)
+        except:
+            pass
+        raise HTTPException(400, f"Transfer failed: {str(e)}")
 
 @router.get("", response_model=list[TransactionOut])
 async def list_transactions(
@@ -112,7 +147,7 @@ async def list_transactions(
 @router.get("/{transaction_id}", response_model=TransactionOut)
 async def get_transaction(transaction_id: str, user=Depends(verify_token)):
     try:
-        tx = await transactions.find_one({"_id": ObjectId(transaction_id)})
+        tx = await transactions.find_one({"txId": transaction_id})
     except:
         raise HTTPException(400, "Invalid transaction ID")
     

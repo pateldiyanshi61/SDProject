@@ -23,7 +23,7 @@ services:
   configsvr:
     image: mongo:6.0
     container_name: configsvr
-    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
+    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all --dbpath /data/db
     volumes:
       - configsvr-data:/data/db
     healthcheck:
@@ -38,7 +38,7 @@ services:
   shard1:
     image: mongo:6.0
     container_name: shard1
-    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all --dbpath /data/db
     volumes:
       - shard1-data:/data/db
     healthcheck:
@@ -53,11 +53,11 @@ services:
   shard2:
     image: mongo:6.0
     container_name: shard2
-    command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --bind_ip_all
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27028 --bind_ip_all --dbpath /data/db
     volumes:
       - shard2-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--port", "27028", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -78,7 +78,7 @@ services:
     entrypoint: >
       bash -c "
       echo 'Waiting for MongoDB instances to be ready...' &&
-      sleep 10 &&
+      sleep 15 &&
 
       echo 'Initializing config server replica set...' &&
       mongosh --host configsvr:27019 --quiet --eval '
@@ -99,7 +99,7 @@ services:
       ' &&
 
       echo 'Waiting for config server to be ready...' &&
-      sleep 5 &&
+      sleep 10 &&
 
       echo 'Initializing shard1 replica set...' &&
       mongosh --host shard1:27018 --quiet --eval '
@@ -119,11 +119,11 @@ services:
       ' &&
 
       echo 'Initializing shard2 replica set...' &&
-      mongosh --host shard2:27018 --quiet --eval '
+      mongosh --host shard2:27028 --quiet --eval '
         try {
           rs.initiate({
             _id: \"shard2ReplSet\",
-            members: [{ _id: 0, host: \"shard2:27018\" }]
+            members: [{ _id: 0, host: \"shard2:27028\" }]
           });
           print(\"Shard2 replica set initiated\");
         } catch (e) {
@@ -163,6 +163,26 @@ services:
       retries: 5
     networks:
       - mongo-net
+      - backend-net
+
+  # ---------- API GATEWAY ----------
+  api-gateway:
+    build: ./api-gateway-service
+    container_name: api-gateway
+    depends_on:
+      - auth-service
+      - account-service
+      - transaction-service
+      - notification-service
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8000
+      - ACCOUNT_SERVICE_URL=http://account-service:8001
+      - TRANSACTION_SERVICE_URL=http://transaction-service:8002
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8003
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
       - backend-net
 
   # ---------- INIT SHARDING ----------
@@ -212,12 +232,17 @@ services:
     build: ./account-service
     container_name: account-service
     depends_on:
+      auth-service:
+        condition: service_started
       init-sharding:
         condition: service_completed_successfully
     environment:
       - MONGO_URI=mongodb://mongos:27017
       - JWT_SECRET=your_super_secret_jwt_key_change_in_production
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     ports:
       - "8001:8001"
     restart: unless-stopped
