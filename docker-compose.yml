@@ -23,14 +23,15 @@ services:
   configsvr:
     image: mongo:6.0
     container_name: configsvr
-    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all --dbpath /data/db
+    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
     volumes:
       - configsvr-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27019", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--port", "27019", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
     networks:
       - mongo-net
 
@@ -38,14 +39,15 @@ services:
   shard1:
     image: mongo:6.0
     container_name: shard1
-    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all --dbpath /data/db
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all
     volumes:
       - shard1-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
     networks:
       - mongo-net
 
@@ -53,14 +55,15 @@ services:
   shard2:
     image: mongo:6.0
     container_name: shard2
-    command: mongod --shardsvr --replSet shard2ReplSet --port 27028 --bind_ip_all --dbpath /data/db
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --bind_ip_all
     volumes:
       - shard2-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27028", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
     networks:
       - mongo-net
 
@@ -77,67 +80,87 @@ services:
         condition: service_healthy
     entrypoint: >
       bash -c "
-      echo 'Waiting for MongoDB instances to be ready...' &&
-      sleep 15 &&
-
-      echo 'Initializing config server replica set...' &&
-      mongosh --host configsvr:27019 --quiet --eval '
-        try {
-          rs.initiate({
-            _id: \"configReplSet\",
-            configsvr: true,
-            members: [{ _id: 0, host: \"configsvr:27019\" }]
-          });
-          print(\"Config server replica set initiated\");
-        } catch (e) {
-          if (e.codeName === \"AlreadyInitialized\") {
-            print(\"Config server already initialized\");
-          } else {
-            throw e;
-          }
-        }
-      ' &&
-
-      echo 'Waiting for config server to be ready...' &&
+      echo '=== Waiting for MongoDB instances to be ready ===' &&
       sleep 10 &&
 
-      echo 'Initializing shard1 replica set...' &&
+      echo '=== Initializing Config Server Replica Set ===' &&
+      mongosh --host configsvr:27019 --quiet --eval '
+        try {
+          var status = rs.status();
+          print(\"Config server already initialized\");
+        } catch (e) {
+          if (e.codeName === \"NotYetInitialized\") {
+            rs.initiate({
+              _id: \"configReplSet\",
+              configsvr: true,
+              members: [{ _id: 0, host: \"configsvr:27019\" }]
+            });
+            print(\"Config server replica set initiated\");
+          } else {
+            throw e;
+          }
+        }
+      ' &&
+
+      echo '=== Waiting for config server PRIMARY ===' &&
+      until mongosh --host configsvr:27019 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+        echo \"Waiting for config server to become PRIMARY...\"
+        sleep 3
+      done &&
+      echo \"Config server is PRIMARY\" &&
+
+      echo '=== Initializing Shard1 Replica Set ===' &&
       mongosh --host shard1:27018 --quiet --eval '
         try {
-          rs.initiate({
-            _id: \"shard1ReplSet\",
-            members: [{ _id: 0, host: \"shard1:27018\" }]
-          });
-          print(\"Shard1 replica set initiated\");
+          var status = rs.status();
+          print(\"Shard1 already initialized\");
         } catch (e) {
-          if (e.codeName === \"AlreadyInitialized\") {
-            print(\"Shard1 already initialized\");
+          if (e.codeName === \"NotYetInitialized\") {
+            rs.initiate({
+              _id: \"shard1ReplSet\",
+              members: [{ _id: 0, host: \"shard1:27018\" }]
+            });
+            print(\"Shard1 replica set initiated\");
           } else {
             throw e;
           }
         }
       ' &&
 
-      echo 'Initializing shard2 replica set...' &&
-      mongosh --host shard2:27028 --quiet --eval '
+      echo '=== Waiting for shard1 PRIMARY ===' &&
+      until mongosh --host shard1:27018 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+        echo \"Waiting for shard1 to become PRIMARY...\"
+        sleep 3
+      done &&
+      echo \"Shard1 is PRIMARY\" &&
+
+      echo '=== Initializing Shard2 Replica Set ===' &&
+      mongosh --host shard2:27018 --quiet --eval '
         try {
-          rs.initiate({
-            _id: \"shard2ReplSet\",
-            members: [{ _id: 0, host: \"shard2:27028\" }]
-          });
-          print(\"Shard2 replica set initiated\");
+          var status = rs.status();
+          print(\"Shard2 already initialized\");
         } catch (e) {
-          if (e.codeName === \"AlreadyInitialized\") {
-            print(\"Shard2 already initialized\");
+          if (e.codeName === \"NotYetInitialized\") {
+            rs.initiate({
+              _id: \"shard2ReplSet\",
+              members: [{ _id: 0, host: \"shard2:27018\" }]
+            });
+            print(\"Shard2 replica set initiated\");
           } else {
             throw e;
           }
         }
       ' &&
 
-      echo 'Waiting for replica sets to stabilize...' &&
-      sleep 15 &&
-      echo 'Replica set initialization complete'
+      echo '=== Waiting for shard2 PRIMARY ===' &&
+      until mongosh --host shard2:27018 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+        echo \"Waiting for shard2 to become PRIMARY...\"
+        sleep 3
+      done &&
+      echo \"Shard2 is PRIMARY\" &&
+
+      echo '=== All replica sets initialized and ready ===' &&
+      sleep 5
       "
     networks:
       - mongo-net
@@ -149,40 +172,17 @@ services:
     depends_on:
       init-replica-sets:
         condition: service_completed_successfully
-    command: >
-      bash -c "
-      echo 'Starting mongos router...' &&
-      mongos --configdb configReplSet/configsvr:27019 --bind_ip_all --port 27017
-      "
+    command: mongos --configdb configReplSet/configsvr:27019 --bind_ip_all --port 27017
     ports:
       - "27017:27017"
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     networks:
       - mongo-net
-      - backend-net
-
-  # ---------- API GATEWAY ----------
-  api-gateway:
-    build: ./api-gateway-service
-    container_name: api-gateway
-    depends_on:
-      - auth-service
-      - account-service
-      - transaction-service
-      - notification-service
-    environment:
-      - AUTH_SERVICE_URL=http://auth-service:8000
-      - ACCOUNT_SERVICE_URL=http://account-service:8001
-      - TRANSACTION_SERVICE_URL=http://transaction-service:8002
-      - NOTIFICATION_SERVICE_URL=http://notification-service:8003
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
-    networks:
       - backend-net
 
   # ---------- INIT SHARDING ----------
@@ -196,11 +196,20 @@ services:
       - ./init-sharding.js:/init-sharding.js
     entrypoint: >
       bash -c "
-      echo 'Waiting for mongos to be fully ready...' &&
-      sleep 20 &&
-      echo 'Running sharding initialization...' &&
-      mongosh --host mongos:27017 /init-sharding.js &&
-      echo 'Sharding initialization completed'
+      echo '=== Waiting for mongos to be fully operational ===' &&
+      sleep 15 &&
+      
+      echo '=== Running sharding initialization script ===' &&
+      mongosh --host mongos:27017 --file /init-sharding.js &&
+      
+      echo '=== Verifying sharding setup ===' &&
+      mongosh --host mongos:27017 --quiet --eval '
+        var status = sh.status();
+        print(\"Shards configured: \" + status.shards.length);
+        printjson(sh.status());
+      ' &&
+      
+      echo '=== Sharding initialization completed successfully ==='
       "
     networks:
       - mongo-net
@@ -223,6 +232,11 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - backend-net
       - mongo-net
@@ -233,19 +247,21 @@ services:
     container_name: account-service
     depends_on:
       auth-service:
-        condition: service_started
+        condition: service_healthy
       init-sharding:
         condition: service_completed_successfully
     environment:
       - MONGO_URI=mongodb://mongos:27017
       - JWT_SECRET=your_super_secret_jwt_key_change_in_production
       - AUTH_SERVICE_URL=http://auth-service:8000
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_USER=guest
-      - RABBITMQ_PASS=guest
     ports:
       - "8001:8001"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - backend-net
       - mongo-net
@@ -256,9 +272,7 @@ services:
     container_name: transaction-service
     depends_on:
       account-service:
-        condition: service_started
-      init-sharding:
-        condition: service_completed_successfully
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     environment:
@@ -271,6 +285,11 @@ services:
     ports:
       - "8002:8002"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - backend-net
       - mongo-net
@@ -294,6 +313,11 @@ services:
     ports:
       - "8003:8003"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - backend-net
       - mongo-net

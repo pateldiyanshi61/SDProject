@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Request
 from passlib.context import CryptContext
 from ..db import users
 from ..schemas import UserCreate, UserOut, LoginIn
@@ -9,7 +9,8 @@ pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserOut)
-async def register(payload: UserCreate):
+async def register(payload: UserCreate, request: Request):
+    print(await request.json())
     if await users.find_one({"email": payload.email}):
         raise HTTPException(400, "Email exists")
     pw_hash = pwd.hash(payload.password)
