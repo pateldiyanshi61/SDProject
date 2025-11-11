@@ -122,6 +122,26 @@ print("=== Creating Database Indexes ===\n");
 
 db = db.getSiblingDB("banking");
 
+// Pre-create collections that don't exist yet
+print("Pre-creating collections...");
+try {
+    db.createCollection("users");
+    print("✓ Created users collection");
+} catch (e) {
+    if (e.codeName === "NamespaceExists") {
+        print("  Users collection already exists");
+    }
+}
+
+try {
+    db.createCollection("notifications");
+    print("✓ Created notifications collection");
+} catch (e) {
+    if (e.codeName === "NamespaceExists") {
+        print("  Notifications collection already exists");
+    }
+}
+
 // Helper function to create index safely
 function createIndexSafely(collection, indexSpec, options, indexName) {
     try {
