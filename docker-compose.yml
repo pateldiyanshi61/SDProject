@@ -201,7 +201,7 @@ services:
       # set AUTO_CLEAN to "true" if you want the script to dump -> drop -> addShard -> restore automatically
       - AUTO_CLEAN=false
       - MONGOS_HOST=mongos:27017
-      - SHARD_HOSTS=shard1:27018\ shard2:27018
+      - 'SHARD_HOSTS=shard1:27018 shard2:27018'
       - DB_TO_CHECK=banking
     networks:
       - mongo-net
