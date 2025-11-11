@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 pydantic
 motor
-passlib[bcrypt]
+passlib==1.7.4
 pyjwt
 pika
 python-dotenv
