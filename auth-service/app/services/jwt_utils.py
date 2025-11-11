@@ -1,6 +1,6 @@
 import os, jwt, datetime
 
-SECRET = os.getenv("JWT_SECRET", "CHANGE_THIS_SECRET")
+SECRET = os.getenv("JWT_SECRET", "your_super_secret_jwt_key_change_in_production")
 ALGO = "HS256"
 
 def create_access_token(data: dict, expires_minutes: int = 60):

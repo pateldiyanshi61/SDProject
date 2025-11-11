@@ -193,26 +193,19 @@ services:
       mongos:
         condition: service_healthy
     volumes:
-      - ./init-sharding.js:/init-sharding.js
-    entrypoint: >
-      bash -c "
-      echo '=== Waiting for mongos to be fully operational ===' &&
-      sleep 15 &&
-      
-      echo '=== Running sharding initialization script ===' &&
-      mongosh --host mongos:27017 --file /init-sharding.js &&
-      
-      echo '=== Verifying sharding setup ===' &&
-      mongosh --host mongos:27017 --quiet --eval '
-        var status = sh.status();
-        print(\"Shards configured: \" + status.shards.length);
-        printjson(sh.status());
-      ' &&
-      
-      echo '=== Sharding initialization completed successfully ==='
-      "
+      - ./init-sharding.js:/init-sharding.js:ro
+      - ./init-shard-entrypoint.sh:/init-shard-entrypoint.sh:ro
+      - shard-dumps:/tmp/shard_dumps
+    entrypoint: ["/bin/bash", "/init-shard-entrypoint.sh"]
+    environment:
+      # set AUTO_CLEAN to "true" if you want the script to dump -> drop -> addShard -> restore automatically
+      - AUTO_CLEAN=false
+      - MONGOS_HOST=mongos:27017
+      - SHARD_HOSTS=shard1:27018\ shard2:27018
+      - DB_TO_CHECK=banking
     networks:
       - mongo-net
+
 
   # ---------- AUTH SERVICE ----------
   auth-service:
@@ -332,3 +325,4 @@ volumes:
   configsvr-data:
   shard1-data:
   shard2-data:
+  shard-dumps:
