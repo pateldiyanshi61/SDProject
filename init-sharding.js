@@ -1,4 +1,4 @@
-// init-sharding.js - Fixed version with better error handling
+// init-sharding.js - Optimized for banking system with notifications sharding
 print("=== Starting MongoDB Sharding Initialization ===\n");
 
 // Function to safely execute and handle errors
@@ -29,7 +29,7 @@ safeExecute("Adding Shard1", function () {
 
         if (shards) {
             for (var i = 0; i < shards.length; i++) {
-                if (shards[i]._id === "shard1ReplSet") {
+                if (shards[i]._id === "shard1Repl") {
                     shard1Exists = true;
                     break;
                 }
@@ -37,7 +37,7 @@ safeExecute("Adding Shard1", function () {
         }
 
         if (!shard1Exists) {
-            sh.addShard("shard1ReplSet/shard1:27018");
+            sh.addShard("shard1Repl/shard1a:27017,shard1b:27017,shard1c:27017");
             return "Shard1 added successfully";
         } else {
             return "Shard1 already exists";
@@ -58,7 +58,7 @@ safeExecute("Adding Shard2", function () {
 
         if (shards) {
             for (var i = 0; i < shards.length; i++) {
-                if (shards[i]._id === "shard2ReplSet") {
+                if (shards[i]._id === "shard2Repl") {
                     shard2Exists = true;
                     break;
                 }
@@ -66,7 +66,7 @@ safeExecute("Adding Shard2", function () {
         }
 
         if (!shard2Exists) {
-            sh.addShard("shard2ReplSet/shard2:27018");
+            sh.addShard("shard2Repl/shard2a:27017,shard2b:27017,shard2c:27017");
             return "Shard2 added successfully";
         } else {
             return "Shard2 already exists";
@@ -74,6 +74,35 @@ safeExecute("Adding Shard2", function () {
     } catch (e) {
         if (e.message.includes("already") || e.codeName === "AlreadyInitialized") {
             return "Shard2 already exists";
+        }
+        throw e;
+    }
+});
+
+// Add Shard3
+safeExecute("Adding Shard3", function () {
+    try {
+        var shards = sh.status().shards;
+        var shard3Exists = false;
+
+        if (shards) {
+            for (var i = 0; i < shards.length; i++) {
+                if (shards[i]._id === "shard3Repl") {
+                    shard3Exists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!shard3Exists) {
+            sh.addShard("shard3Repl/shard3a:27017,shard3b:27017,shard3c:27017");
+            return "Shard3 added successfully";
+        } else {
+            return "Shard3 already exists";
+        }
+    } catch (e) {
+        if (e.message.includes("already") || e.codeName === "AlreadyInitialized") {
+            return "Shard3 already exists";
         }
         throw e;
     }
@@ -92,11 +121,11 @@ safeExecute("Enabling sharding on 'banking' database", function () {
     }
 });
 
-// Shard the accounts collection
+// Shard the accounts collection (by accountNumber)
 safeExecute("Sharding 'accounts' collection", function () {
     try {
         sh.shardCollection("banking.accounts", { accountNumber: "hashed" });
-        return "Accounts collection sharded";
+        return "Accounts collection sharded by accountNumber (hashed)";
     } catch (e) {
         if (e.message.includes("already sharded") || e.codeName === "AlreadyInitialized") {
             return "Accounts collection already sharded";
@@ -105,14 +134,28 @@ safeExecute("Sharding 'accounts' collection", function () {
     }
 });
 
-// Shard the transactions collection
+// Shard the transactions collection (by txId)
 safeExecute("Sharding 'transactions' collection", function () {
     try {
         sh.shardCollection("banking.transactions", { txId: "hashed" });
-        return "Transactions collection sharded";
+        return "Transactions collection sharded by txId (hashed)";
     } catch (e) {
         if (e.message.includes("already sharded") || e.codeName === "AlreadyInitialized") {
             return "Transactions collection already sharded";
+        }
+        throw e;
+    }
+});
+
+// OPTIONAL: Shard the notifications collection (by userId)
+// This distributes user notifications across shards for better scalability
+safeExecute("Sharding 'notifications' collection", function () {
+    try {
+        sh.shardCollection("banking.notifications", { userId: "hashed" });
+        return "Notifications collection sharded by userId (hashed)";
+    } catch (e) {
+        if (e.message.includes("already sharded") || e.codeName === "AlreadyInitialized") {
+            return "Notifications collection already sharded";
         }
         throw e;
     }
@@ -179,16 +222,56 @@ createIndexSafely("users", { "createdAt": -1 }, {}, "createdAt");
 createIndexSafely("accounts", { "userId": 1 }, {}, "userId");
 createIndexSafely("accounts", { "accountNumber": 1 }, { unique: true }, "accountNumber_unique");
 createIndexSafely("accounts", { "status": 1 }, {}, "status");
+createIndexSafely("accounts", { "createdAt": -1 }, {}, "createdAt");
 
 // Transaction indexes
 createIndexSafely("transactions", { "fromAccount": 1, "createdAt": -1 }, {}, "fromAccount_createdAt");
 createIndexSafely("transactions", { "toAccount": 1, "createdAt": -1 }, {}, "toAccount_createdAt");
 createIndexSafely("transactions", { "txId": 1 }, { unique: true }, "txId_unique");
 createIndexSafely("transactions", { "status": 1 }, {}, "status");
+createIndexSafely("transactions", { "createdAt": -1 }, {}, "createdAt");
 
-// Notification indexes
+// Notification indexes (optimized for sharded queries)
 createIndexSafely("notifications", { "userId": 1, "createdAt": -1 }, {}, "userId_createdAt");
+createIndexSafely("notifications", { "userId": 1, "delivered": 1 }, {}, "userId_delivered");
+createIndexSafely("notifications", { "userId": 1, "type": 1 }, {}, "userId_type");
 createIndexSafely("notifications", { "delivered": 1 }, {}, "delivered");
 
-print("\n=== Sharding Initialization Complete! ===\n");
+print("\n=== Sharding Configuration Summary ===");
+print("┌─────────────────────────────────────────────────────┐");
+print("│ CLUSTER TOPOLOGY                                    │");
+print("├─────────────────────────────────────────────────────┤");
+print("│ Config Servers: 3 replicas                          │");
+print("│   - config1, config2, config3                       │");
+print("│                                                     │");
+print("│ Shards: 3 replica sets (9 nodes total)             │");
+print("│   - Shard1: shard1a, shard1b, shard1c              │");
+print("│   - Shard2: shard2a, shard2b, shard2c              │");
+print("│   - Shard3: shard3a, shard3b, shard3c              │");
+print("└─────────────────────────────────────────────────────┘");
+print("");
+print("┌─────────────────────────────────────────────────────┐");
+print("│ SHARDED COLLECTIONS                                 │");
+print("├─────────────────────────────────────────────────────┤");
+print("│ banking.accounts                                    │");
+print("│   Shard Key: { accountNumber: 'hashed' }           │");
+print("│   Purpose: Distribute accounts evenly               │");
+print("│                                                     │");
+print("│ banking.transactions                                │");
+print("│   Shard Key: { txId: 'hashed' }                    │");
+print("│   Purpose: Distribute transactions evenly           │");
+print("│                                                     │");
+print("│ banking.notifications                               │");
+print("│   Shard Key: { userId: 'hashed' }                  │");
+print("│   Purpose: Keep user notifications together         │");
+print("└─────────────────────────────────────────────────────┘");
+print("");
+print("┌─────────────────────────────────────────────────────┐");
+print("│ NON-SHARDED COLLECTIONS (Primary Shard)             │");
+print("├─────────────────────────────────────────────────────┤");
+print("│ banking.users                                       │");
+print("│   Reason: Small dataset, frequently joined          │");
+print("└─────────────────────────────────────────────────────┘");
+print("\n=== Initialization Complete! ===\n");
+
 quit(0);
