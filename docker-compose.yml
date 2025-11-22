@@ -19,15 +19,15 @@ services:
     networks:
       - backend-net
 
-  # ---------- CONFIG SERVER ----------
-  configsvr:
+  # ---------- CONFIG SERVERS (3 replicas) ----------
+  config1:
     image: mongo:6.0
-    container_name: configsvr
-    command: mongod --configsvr --replSet configReplSet --port 27019 --bind_ip_all
+    container_name: config1
+    command: mongod --configsvr --replSet configReplSet --port 27017 --bind_ip_all
     volumes:
-      - configsvr-data:/data/db
+      - config1-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27019", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -35,15 +35,14 @@ services:
     networks:
       - mongo-net
 
-  # ---------- SHARD 1 ----------
-  shard1:
+  config2:
     image: mongo:6.0
-    container_name: shard1
-    command: mongod --shardsvr --replSet shard1ReplSet --port 27018 --bind_ip_all
+    container_name: config2
+    command: mongod --configsvr --replSet configReplSet --port 27017 --bind_ip_all
     volumes:
-      - shard1-data:/data/db
+      - config2-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -51,15 +50,152 @@ services:
     networks:
       - mongo-net
 
-  # ---------- SHARD 2 ----------
-  shard2:
+  config3:
     image: mongo:6.0
-    container_name: shard2
-    command: mongod --shardsvr --replSet shard2ReplSet --port 27018 --bind_ip_all
+    container_name: config3
+    command: mongod --configsvr --replSet configReplSet --port 27017 --bind_ip_all
     volumes:
-      - shard2-data:/data/db
+      - config3-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--port", "27018", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  # ---------- SHARD 1 (3 replicas) ----------
+  shard1a:
+    image: mongo:6.0
+    container_name: shard1a
+    command: mongod --shardsvr --replSet shard1Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard1a-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard1b:
+    image: mongo:6.0
+    container_name: shard1b
+    command: mongod --shardsvr --replSet shard1Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard1b-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard1c:
+    image: mongo:6.0
+    container_name: shard1c
+    command: mongod --shardsvr --replSet shard1Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard1c-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  # ---------- SHARD 2 (3 replicas) ----------
+  shard2a:
+    image: mongo:6.0
+    container_name: shard2a
+    command: mongod --shardsvr --replSet shard2Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard2a-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard2b:
+    image: mongo:6.0
+    container_name: shard2b
+    command: mongod --shardsvr --replSet shard2Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard2b-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard2c:
+    image: mongo:6.0
+    container_name: shard2c
+    command: mongod --shardsvr --replSet shard2Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard2c-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  # ---------- SHARD 3 (3 replicas) ----------
+  shard3a:
+    image: mongo:6.0
+    container_name: shard3a
+    command: mongod --shardsvr --replSet shard3Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard3a-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard3b:
+    image: mongo:6.0
+    container_name: shard3b
+    command: mongod --shardsvr --replSet shard3Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard3b-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - mongo-net
+
+  shard3c:
+    image: mongo:6.0
+    container_name: shard3c
+    command: mongod --shardsvr --replSet shard3Repl --port 27017 --bind_ip_all
+    volumes:
+      - shard3c-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -72,11 +208,29 @@ services:
     image: mongo:6.0
     container_name: init-replica-sets
     depends_on:
-      configsvr:
+      config1:
         condition: service_healthy
-      shard1:
+      config2:
         condition: service_healthy
-      shard2:
+      config3:
+        condition: service_healthy
+      shard1a:
+        condition: service_healthy
+      shard1b:
+        condition: service_healthy
+      shard1c:
+        condition: service_healthy
+      shard2a:
+        condition: service_healthy
+      shard2b:
+        condition: service_healthy
+      shard2c:
+        condition: service_healthy
+      shard3a:
+        condition: service_healthy
+      shard3b:
+        condition: service_healthy
+      shard3c:
         condition: service_healthy
     entrypoint: >
       bash -c "
@@ -84,7 +238,7 @@ services:
       sleep 10 &&
 
       echo '=== Initializing Config Server Replica Set ===' &&
-      mongosh --host configsvr:27019 --quiet --eval '
+      mongosh --host config1:27017 --quiet --eval '
         try {
           var status = rs.status();
           print(\"Config server already initialized\");
@@ -93,7 +247,11 @@ services:
             rs.initiate({
               _id: \"configReplSet\",
               configsvr: true,
-              members: [{ _id: 0, host: \"configsvr:27019\" }]
+              members: [
+                { _id: 0, host: \"config1:27017\" },
+                { _id: 1, host: \"config2:27017\" },
+                { _id: 2, host: \"config3:27017\" }
+              ]
             });
             print(\"Config server replica set initiated\");
           } else {
@@ -103,22 +261,26 @@ services:
       ' &&
 
       echo '=== Waiting for config server PRIMARY ===' &&
-      until mongosh --host configsvr:27019 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+      until mongosh --host config1:27017 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
         echo \"Waiting for config server to become PRIMARY...\"
         sleep 3
       done &&
       echo \"Config server is PRIMARY\" &&
 
       echo '=== Initializing Shard1 Replica Set ===' &&
-      mongosh --host shard1:27018 --quiet --eval '
+      mongosh --host shard1a:27017 --quiet --eval '
         try {
           var status = rs.status();
           print(\"Shard1 already initialized\");
         } catch (e) {
           if (e.codeName === \"NotYetInitialized\") {
             rs.initiate({
-              _id: \"shard1ReplSet\",
-              members: [{ _id: 0, host: \"shard1:27018\" }]
+              _id: \"shard1Repl\",
+              members: [
+                { _id: 0, host: \"shard1a:27017\" },
+                { _id: 1, host: \"shard1b:27017\" },
+                { _id: 2, host: \"shard1c:27017\" }
+              ]
             });
             print(\"Shard1 replica set initiated\");
           } else {
@@ -128,22 +290,26 @@ services:
       ' &&
 
       echo '=== Waiting for shard1 PRIMARY ===' &&
-      until mongosh --host shard1:27018 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+      until mongosh --host shard1a:27017 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
         echo \"Waiting for shard1 to become PRIMARY...\"
         sleep 3
       done &&
       echo \"Shard1 is PRIMARY\" &&
 
       echo '=== Initializing Shard2 Replica Set ===' &&
-      mongosh --host shard2:27018 --quiet --eval '
+      mongosh --host shard2a:27017 --quiet --eval '
         try {
           var status = rs.status();
           print(\"Shard2 already initialized\");
         } catch (e) {
           if (e.codeName === \"NotYetInitialized\") {
             rs.initiate({
-              _id: \"shard2ReplSet\",
-              members: [{ _id: 0, host: \"shard2:27018\" }]
+              _id: \"shard2Repl\",
+              members: [
+                { _id: 0, host: \"shard2a:27017\" },
+                { _id: 1, host: \"shard2b:27017\" },
+                { _id: 2, host: \"shard2c:27017\" }
+              ]
             });
             print(\"Shard2 replica set initiated\");
           } else {
@@ -153,11 +319,40 @@ services:
       ' &&
 
       echo '=== Waiting for shard2 PRIMARY ===' &&
-      until mongosh --host shard2:27018 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+      until mongosh --host shard2a:27017 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
         echo \"Waiting for shard2 to become PRIMARY...\"
         sleep 3
       done &&
       echo \"Shard2 is PRIMARY\" &&
+
+      echo '=== Initializing Shard3 Replica Set ===' &&
+      mongosh --host shard3a:27017 --quiet --eval '
+        try {
+          var status = rs.status();
+          print(\"Shard3 already initialized\");
+        } catch (e) {
+          if (e.codeName === \"NotYetInitialized\") {
+            rs.initiate({
+              _id: \"shard3Repl\",
+              members: [
+                { _id: 0, host: \"shard3a:27017\" },
+                { _id: 1, host: \"shard3b:27017\" },
+                { _id: 2, host: \"shard3c:27017\" }
+              ]
+            });
+            print(\"Shard3 replica set initiated\");
+          } else {
+            throw e;
+          }
+        }
+      ' &&
+
+      echo '=== Waiting for shard3 PRIMARY ===' &&
+      until mongosh --host shard3a:27017 --quiet --eval \"rs.status().myState\" | grep -q \"1\"; do
+        echo \"Waiting for shard3 to become PRIMARY...\"
+        sleep 3
+      done &&
+      echo \"Shard3 is PRIMARY\" &&
 
       echo '=== All replica sets initialized and ready ===' &&
       sleep 5
@@ -172,7 +367,7 @@ services:
     depends_on:
       init-replica-sets:
         condition: service_completed_successfully
-    command: mongos --configdb configReplSet/configsvr:27019 --bind_ip_all --port 27017
+    command: mongos --configdb configReplSet/config1:27017,config2:27017,config3:27017 --bind_ip_all --port 27017
     ports:
       - "27017:27017"
     healthcheck:
@@ -198,14 +393,12 @@ services:
       - shard-dumps:/tmp/shard_dumps
     entrypoint: ["/bin/bash", "/init-shard-entrypoint.sh"]
     environment:
-      # set AUTO_CLEAN to "true" if you want the script to dump -> drop -> addShard -> restore automatically
       - AUTO_CLEAN=false
       - MONGOS_HOST=mongos:27017
-      - 'SHARD_HOSTS=shard1:27018 shard2:27018'
+      - 'SHARD_HOSTS=shard1a:27017 shard2a:27017 shard3a:27017'
       - DB_TO_CHECK=banking
     networks:
       - mongo-net
-
 
   # ---------- AUTH SERVICE ----------
   auth-service:
@@ -322,7 +515,16 @@ networks:
     driver: bridge
 
 volumes:
-  configsvr-data:
-  shard1-data:
-  shard2-data:
+  config1-data:
+  config2-data:
+  config3-data:
+  shard1a-data:
+  shard1b-data:
+  shard1c-data:
+  shard2a-data:
+  shard2b-data:
+  shard2c-data:
+  shard3a-data:
+  shard3b-data:
+  shard3c-data:
   shard-dumps:
