@@ -1,0 +1,123 @@
+alpine: Pulling from library/nginx
+2d35ebdb57d9: Pulling fs layer
+8f6a6833e95d: Pulling fs layer
+194fa24e147d: Pulling fs layer
+3eaba6cd10a3: Pulling fs layer
+df413d6ebdc8: Pulling fs layer
+d9a55dab5954: Pulling fs layer
+3eaba6cd10a3: Waiting
+df413d6ebdc8: Waiting
+ff8a36d5502a: Pulling fs layer
+d9a55dab5954: Waiting
+bdabb0d44271: Pulling fs layer
+ff8a36d5502a: Waiting
+bdabb0d44271: Waiting
+194fa24e147d: Downloading
+194fa24e147d: Retrying in 5 seconds
+8f6a6833e95d: Retrying in 5 seconds
+2d35ebdb57d9: Retrying in 5 seconds
+194fa24e147d: Retrying in 4 seconds
+8f6a6833e95d: Retrying in 4 seconds
+2d35ebdb57d9: Retrying in 4 seconds
+194fa24e147d: Retrying in 3 seconds
+8f6a6833e95d: Retrying in 3 seconds
+2d35ebdb57d9: Retrying in 3 seconds
+194fa24e147d: Retrying in 2 seconds
+8f6a6833e95d: Retrying in 2 seconds
+2d35ebdb57d9: Retrying in 2 seconds
+194fa24e147d: Retrying in 1 second
+8f6a6833e95d: Retrying in 1 second
+2d35ebdb57d9: Retrying in 1 second
+error pulling image configuration: download failed after attempts=6: EOF
+alpine: Pulling from library/nginx
+2d35ebdb57d9: Pulling fs layer
+8f6a6833e95d: Pulling fs layer
+194fa24e147d: Pulling fs layer
+3eaba6cd10a3: Pulling fs layer
+df413d6ebdc8: Pulling fs layer
+d9a55dab5954: Pulling fs layer
+ff8a36d5502a: Pulling fs layer
+3eaba6cd10a3: Waiting
+df413d6ebdc8: Waiting
+d9a55dab5954: Waiting
+bdabb0d44271: Pulling fs layer
+ff8a36d5502a: Waiting
+bdabb0d44271: Waiting
+8f6a6833e95d: Retrying in 5 seconds
+194fa24e147d: Retrying in 5 seconds
+2d35ebdb57d9: Retrying in 5 seconds
+8f6a6833e95d: Retrying in 4 seconds
+194fa24e147d: Retrying in 4 seconds
+2d35ebdb57d9: Retrying in 4 seconds
+8f6a6833e95d: Retrying in 3 seconds
+194fa24e147d: Retrying in 3 seconds
+2d35ebdb57d9: Retrying in 3 seconds
+8f6a6833e95d: Retrying in 2 seconds
+194fa24e147d: Retrying in 2 seconds
+2d35ebdb57d9: Retrying in 2 seconds
+8f6a6833e95d: Retrying in 1 second
+194fa24e147d: Retrying in 1 second
+2d35ebdb57d9: Retrying in 1 second
+error pulling image configuration: download failed after attempts=6: EOF
+alpine: Pulling from library/nginx
+2d35ebdb57d9: Pulling fs layer
+8f6a6833e95d: Pulling fs layer
+194fa24e147d: Pulling fs layer
+3eaba6cd10a3: Pulling fs layer
+df413d6ebdc8: Pulling fs layer
+3eaba6cd10a3: Waiting
+d9a55dab5954: Pulling fs layer
+ff8a36d5502a: Pulling fs layer
+bdabb0d44271: Pulling fs layer
+df413d6ebdc8: Waiting
+d9a55dab5954: Waiting
+ff8a36d5502a: Waiting
+bdabb0d44271: Waiting
+2d35ebdb57d9: Downloading
+2d35ebdb57d9: Retrying in 5 seconds
+194fa24e147d: Retrying in 5 seconds
+8f6a6833e95d: Retrying in 5 seconds
+2d35ebdb57d9: Retrying in 4 seconds
+194fa24e147d: Retrying in 4 seconds
+8f6a6833e95d: Retrying in 4 seconds
+2d35ebdb57d9: Retrying in 3 seconds
+194fa24e147d: Retrying in 3 seconds
+8f6a6833e95d: Retrying in 3 seconds
+2d35ebdb57d9: Retrying in 2 seconds
+194fa24e147d: Retrying in 2 seconds
+8f6a6833e95d: Retrying in 2 seconds
+2d35ebdb57d9: Retrying in 1 second
+194fa24e147d: Retrying in 1 second
+8f6a6833e95d: Retrying in 1 second
+error pulling image configuration: download failed after attempts=6: EOF
+alpine: Pulling from library/nginx
+2d35ebdb57d9: Pulling fs layer
+8f6a6833e95d: Pulling fs layer
+194fa24e147d: Pulling fs layer
+3eaba6cd10a3: Pulling fs layer
+df413d6ebdc8: Pulling fs layer
+d9a55dab5954: Pulling fs layer
+ff8a36d5502a: Pulling fs layer
+bdabb0d44271: Pulling fs layer
+3eaba6cd10a3: Waiting
+df413d6ebdc8: Waiting
+d9a55dab5954: Waiting
+ff8a36d5502a: Waiting
+bdabb0d44271: Waiting
+194fa24e147d: Downloading
+194fa24e147d: Retrying in 5 seconds
+2d35ebdb57d9: Retrying in 5 seconds
+8f6a6833e95d: Retrying in 5 seconds
+194fa24e147d: Retrying in 4 seconds
+2d35ebdb57d9: Retrying in 4 seconds
+8f6a6833e95d: Retrying in 4 seconds
+194fa24e147d: Retrying in 3 seconds
+2d35ebdb57d9: Retrying in 3 seconds
+8f6a6833e95d: Retrying in 3 seconds
+2d35ebdb57d9: Retrying in 2 seconds
+194fa24e147d: Retrying in 2 seconds
+8f6a6833e95d: Retrying in 2 seconds
+2d35ebdb57d9: Retrying in 1 second
+194fa24e147d: Retrying in 1 second
+8f6a6833e95d: Retrying in 1 second
+error pulling image configuration: download failed after attempts=6: EOF

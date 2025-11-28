@@ -7,5 +7,5 @@ pyjwt
 pika
 python-dotenv
 email-validator
-
-
+redis
+slowapi

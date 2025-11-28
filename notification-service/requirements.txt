@@ -5,3 +5,5 @@ fastapi
 uvicorn[standard]
 pydantic
 pyjwt
+redis
+slowapi
